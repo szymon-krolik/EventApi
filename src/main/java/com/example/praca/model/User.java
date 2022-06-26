@@ -1,6 +1,8 @@
 package com.example.praca.model;
 
 import com.example.praca.dto.CreateUserDto;
+import com.example.praca.dto.InformationUserDto;
+import com.example.praca.dto.UpdateUserDto;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -50,6 +52,7 @@ public class User {
     @UpdateTimestamp
     private Date updatedAt;
 
+
     public static User of(CreateUserDto dto) {
         User user = new User();
 
@@ -60,7 +63,35 @@ public class User {
 
         return user;
     }
-    public boolean isEmpty() {
-        return this.equals(EMPTY);
+
+    public static User of(UpdateUserDto dto) {
+        User user = new User();
+        user.setId(dto.getId());
+        user.setPhoneNumber(dto.getPhoneNumber());
+        user.setName(dto.getName());
+        user.setEmail(dto.getEmail());
+        user.setPassword(dto.getPassword());
+
+        return user;
+    }
+
+    public static User of(InformationUserDto dto) {
+        User user = new User();
+
+        user.setEmail(dto.getEmail());
+        user.setName(dto.getName());
+        user.setPhoneNumber(dto.getPhoneNumber());
+        user.setId(dto.getId());
+
+        return user;
+    }
+
+    public static User updateUser(User user, UpdateUserDto dto) {
+        user.setName(dto.getName());
+        user.setEmail(dto.getEmail());
+        user.setPhoneNumber(dto.getPhoneNumber());
+
+        return user;
+
     }
 }

@@ -7,14 +7,14 @@ import lombok.Data;
  * @author Szymon Królik
  */
 @Data
-public class UserInformationDto {
+public class InformationUserDto {
     private Long id;
     private String name;
     private String email;
     private String phoneNumber;
 
-    public static UserInformationDto of(User user) {
-        UserInformationDto dto = new UserInformationDto();
+    public static InformationUserDto of(User user) {
+        InformationUserDto dto = new InformationUserDto();
 
         dto.setId(user.getId());
         dto.setName(user.getName());

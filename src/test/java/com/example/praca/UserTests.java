@@ -1,7 +1,6 @@
 package com.example.praca;
 
-import com.example.praca.dto.CreateUserDto;
-import com.example.praca.dto.UserInformationDto;
+import com.example.praca.dto.*;
 import com.example.praca.service.ReturnService;
 import com.example.praca.service.UserService;
 import static org.junit.jupiter.api.Assertions.*;
@@ -90,7 +89,7 @@ public class UserTests {
         dto.setPhoneNumber("+48514702363");
         dto.setName("Szymon");
 
-        UserInformationDto dto1 = new UserInformationDto();
+        InformationUserDto dto1 = new InformationUserDto();
         dto1.setEmail("krolik.sz@wp.pl");
         dto1.setPhoneNumber("+48514702363");
         dto1.setName("Szymon");
@@ -115,8 +114,152 @@ public class UserTests {
 
         ReturnService ret = userService.createUser(dto);
         assertEquals(0, ret.getStatus());
-        assertEquals(errMsg,ret.getErrList().get("object"));
+        assertEquals(errMsg,ret.getErrList().get("user"));
 
     }
+
+    @Test
+    public void resendEmailIncorrect() {
+        ResendMailConfirmationDto dto = new ResendMailConfirmationDto();
+        dto.setEmail("kro.s.pl");
+        dto.setPassword("test1");
+
+        ReturnService ret = userService.resendConfirmationToken(dto);
+        assertEquals(0,ret.getStatus());
+        assertEquals("Please enter correct email address", ret.getErrList().get("user"));
+    }
+    @Test
+    public void resendEmailError() {
+        ResendMailConfirmationDto dto = new ResendMailConfirmationDto();
+        dto.setEmail("kro.sz@wp.pl");
+        dto.setPassword("test1");
+
+        ReturnService ret = userService.resendConfirmationToken(dto);
+        assertEquals(0,ret.getStatus());
+        assertEquals("Can't find user with given email", ret.getErrList().get("user"));
+    }
+
+    @Test
+    public void resendEmailNull() {
+        ResendMailConfirmationDto dto = new ResendMailConfirmationDto();
+        dto.setEmail(null);
+        dto.setPassword(null);
+
+        ReturnService ret = userService.resendConfirmationToken(dto);
+        assertEquals(0,ret.getStatus());
+        assertEquals("Please enter correct email address\"", ret.getErrList().get("user"));
+    }
+
+    @Test
+    public void resendEmail() {
+        ResendMailConfirmationDto dto = new ResendMailConfirmationDto();
+        dto.setEmail("krolik.sz@wp.pl");
+        dto.setPassword("test1");
+
+        ReturnService ret = userService.resendConfirmationToken(dto);
+        assertEquals(1,ret.getStatus());
+        assertEquals("Send success", ret.getMessage());
+    }
+
+    @Test
+    public void userLoginValidationError() {
+        LoginUserDto dto = new LoginUserDto();
+        dto.setEmail("");
+        dto.setPassword("");
+        dto.setPhoneNumber("");
+
+        ReturnService ret = userService.loginUser(dto);
+        assertEquals("Please enter phone number or email", ret.getErrList().get("user"));
+        assertEquals(0, ret.getStatus());
+    }
+
+    @Test
+    public void userLoginIncorrectTest() {
+        LoginUserDto dto = new LoginUserDto();
+        dto.setEmail("kr@wp.pl");
+        dto.setPassword("test1");
+        dto.setPhoneNumber("");
+
+        ReturnService ret = userService.loginUser(dto);
+        assertEquals("Incorrect login or password", ret.getErrList().get("user"));
+        assertEquals(0, ret.getStatus());
+    }
+
+    @Test
+    public void userLoginTest() {
+        LoginUserDto dto = new LoginUserDto();
+        dto.setEmail("krolik.sz@wp.pl");
+        dto.setPassword("test1");
+        dto.setPhoneNumber("");
+
+        ReturnService ret = userService.loginUser(dto);
+        InformationUserDto dtoR = (InformationUserDto)ret.getValue();
+        assertEquals("Szymon", dtoR.getName());
+        assertEquals("krolik.sz@wp.pl", dtoR.getEmail());
+        assertEquals("+48514702363", dtoR.getPhoneNumber());
+        assertEquals(1, ret.getStatus());
+    }
+    @Test
+    public void updateUserValidationErrorTest() {
+        UpdateUserDto dto = new UpdateUserDto();
+        dto.setId(1L);
+        dto.setPhoneNumber("+48743");
+        dto.setEmail("krol.pl");
+        dto.setName("Rw");
+        dto.setPassword("test");
+
+        Map<String, String> errList = new HashMap<>();
+        errList.put("password", "Password should match");
+        errList.put("email", "Please provide correct email address");
+        errList.put("password", "Passwords should match");
+        errList.put("name", "Name should have at least 3 characters");
+
+
+        ReturnService ret = userService.updateUser(dto);
+        Map<String, String> errListRet = ret.getErrList();
+
+        assertEquals(0, ret.getStatus());
+        assertEquals(errList.get("name"),errListRet.get("name"));
+        assertEquals(errList.get("email"),errListRet.get("email"));
+        assertEquals(errList.get("password"),errListRet.get("password"));
+        assertEquals(errList.get("phoneNumber"),errListRet.get("phoneNumber"));
+
+    }
+    @Test
+    public void updateUserErrorTest() {
+        UpdateUserDto dto = new UpdateUserDto();
+        dto.setId(3L);
+        dto.setPhoneNumber("+48741852963");
+        dto.setEmail("krolik.sz@wp.pl");
+        dto.setName("Radosław");
+        dto.setPassword("test");
+
+        ReturnService ret = userService.updateUser(dto);
+        assertEquals(0,ret.getStatus());
+        assertEquals("Can't find user with given id",ret.getErrList().get("user"));
+
+    }
+
+    @Test
+    public void updateUserTest() {
+        UpdateUserDto dto = new UpdateUserDto();
+        dto.setId(8L);
+        dto.setPhoneNumber("+48741852963");
+        dto.setEmail("mentalnyyy@gmail.com");
+        dto.setName("Radosła");
+
+        InformationUserDto retDto = new InformationUserDto();
+        retDto.setId(8L);
+        retDto.setPhoneNumber("+48741852963");
+        retDto.setEmail("mentalnyyy@gmail.com");
+        retDto.setName("Radosław");
+
+        ReturnService ret = userService.updateUser(dto);
+        assertEquals(1,ret.getStatus());
+        assertEquals("Succ. update user:",ret.getMessage());
+
+    }
+
+
 
 }

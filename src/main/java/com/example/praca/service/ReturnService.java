@@ -50,4 +50,15 @@ public class ReturnService<T> {
 
         return ret;
     }
+
+    public static <T> ReturnService returnInformation(String msg, int status) {
+        ReturnService ret = new ReturnService();
+
+        ret.setMessage(msg);
+        ret.setStatus(status);
+
+        return ret;
+    }
+
+
 }

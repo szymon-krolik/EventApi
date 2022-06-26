@@ -14,6 +14,8 @@ public class ServiceFunctions<T> {
     private static final String PHONE_NUMBER_REGEX = "(0|91)?[7-9][0-9]{9}";
 
     public static boolean validEmail(String email) {
+        if (isNull(email))
+            return false;
         Pattern pattern = Pattern.compile(EMAIL_REGEX,Pattern.CASE_INSENSITIVE);
         Matcher matcher = pattern.matcher(email);
 
@@ -21,6 +23,8 @@ public class ServiceFunctions<T> {
     }
 
     public static boolean validPhoneNumber(String phoneNumber) {
+        if (isNull(phoneNumber))
+            return false;
         Pattern pattern = Pattern.compile(PHONE_NUMBER_REGEX, Pattern.CASE_INSENSITIVE);
         Matcher matcher = pattern.matcher(phoneNumber);
 
@@ -40,6 +44,8 @@ public class ServiceFunctions<T> {
     public static <T> boolean isNull(T obj) {
         return obj == null;
     }
+
+
 
 
 }
