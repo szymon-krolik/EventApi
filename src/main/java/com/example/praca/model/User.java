@@ -24,7 +24,7 @@ import java.util.Date;
 public class User {
     private static final User EMPTY = new User();
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(nullable = false)

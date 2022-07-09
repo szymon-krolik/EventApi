@@ -21,4 +21,13 @@ public class LoginUserDto {
 
         return user;
     }
+
+    public static LoginUserDto of(UpdateUserPasswordDto dto) {
+        LoginUserDto user = new LoginUserDto();
+
+        user.setEmail(dto.getEmail());
+        user.setPassword(dto.getCurrentPassword());
+
+        return user;
+    }
 }

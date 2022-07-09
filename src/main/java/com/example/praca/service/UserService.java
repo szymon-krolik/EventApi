@@ -8,13 +8,14 @@ import com.example.praca.repository.ConfirmationTokenRepository;
 import com.example.praca.repository.UserRepository;
 import lombok.AllArgsConstructor;
 import org.springframework.mail.SimpleMailMessage;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * @author Szymon Królik
@@ -23,16 +24,16 @@ import java.util.Optional;
 @AllArgsConstructor
 public class UserService {
     private final UserRepository USER_REPOSITORY;
+    private final String USER_NOT_EXIST_MSG = "Can't find user with %s";
+
 
     private final ConfirmationTokenRepository CONFIRMATION_TOKEN_REPOSITORY;
     private final BCryptPasswordEncoder BCRYPT_PASSWORD_ENCODER;
     private final ConfirmationTokenService CONFIRMATION_TOKEN_SERVICE;
     private final EmailService EMAIL_SERVICE;
-    private Map<String, String> validationError = new HashMap<>();
+    private Map<String, String> validationError;
 
-    //TODO change password method
     public ReturnService createUser(CreateUserDto dto) {
-        validationError.clear();
 
         validationError = ValidationService.createUserValidator(dto);
         if (!validationError.isEmpty())
@@ -45,17 +46,27 @@ public class UserService {
 
         dto.setPassword(encodePassword(dto.getPassword()));
 
+
         try {
             User user = USER_REPOSITORY.save(User.of(dto));
+
             final ConfirmationToken CONFIRMATION_TOKEN = new ConfirmationToken(user);
 
             CONFIRMATION_TOKEN_SERVICE.saveConfirmationToken(CONFIRMATION_TOKEN);
-            sendConfirmationToken(user.getEmail(), CONFIRMATION_TOKEN.getConfirmationToken());
+            Thread sendConfirmationThread = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    EMAIL_SERVICE.sendConfirmationToken(user.getEmail(), CONFIRMATION_TOKEN.getConfirmationToken());
+                }
+            });
+
+            sendConfirmationThread.start();
 
             return ReturnService.returnInformation("Succ. user created", InformationUserDto.of(user), 1);
         } catch (Exception e) {
             return ReturnService.returnError("Err. create user exception: " + e.getMessage(), -1);
         }
+
 
     }
 
@@ -68,6 +79,41 @@ public class UserService {
         user.setEnabled(true);
         try {
             User activatedUser = USER_REPOSITORY.save(user);
+            CONFIRMATION_TOKEN_REPOSITORY.deleteById(optionalConfirmationToken.get().getId());
+            return ReturnService.returnInformation("User active", InformationUserDto.of(activatedUser), 1);
+        } catch (Exception ex) {
+            return ReturnService.returnError("Err. User activation: " + ex.getMessage(), -1);
+        }
+    }
+
+    public ReturnService confirmMail(String token) {
+        Optional<ConfirmationToken> optionalConfirmationToken = CONFIRMATION_TOKEN_REPOSITORY.findConfirmationTokenByConfirmationToken(token);
+        if (optionalConfirmationToken.isEmpty())
+            return ReturnService.returnError("error", Collections.singletonMap("token", "Can't find token"), 0);
+
+        User user = optionalConfirmationToken.get().getUser();
+        user.setLocked(false);
+        user.setEnabled(true);
+        try {
+            User activatedUser = USER_REPOSITORY.save(user);
+            CONFIRMATION_TOKEN_REPOSITORY.deleteById(optionalConfirmationToken.get().getId());
+            return ReturnService.returnInformation("User active", InformationUserDto.of(activatedUser), 1);
+        } catch (Exception ex) {
+            return ReturnService.returnError("Err. User activation: " + ex.getMessage(), -1);
+        }
+    }
+
+    public ReturnService confirmPassword(String token) {
+        Optional<ConfirmationToken> optionalConfirmationToken = CONFIRMATION_TOKEN_REPOSITORY.findConfirmationTokenByConfirmationToken(token);
+        if (optionalConfirmationToken.isEmpty())
+            return ReturnService.returnError("error", Collections.singletonMap("token", "Can't find token"), 0);
+
+        User user = optionalConfirmationToken.get().getUser();
+        user.setLocked(false);
+        user.setEnabled(true);
+        try {
+            User activatedUser = USER_REPOSITORY.save(user);
+            CONFIRMATION_TOKEN_REPOSITORY.deleteById(optionalConfirmationToken.get().getId());
             return ReturnService.returnInformation("User active", InformationUserDto.of(activatedUser), 1);
         } catch (Exception ex) {
             return ReturnService.returnError("Err. User activation: " + ex.getMessage(), -1);
@@ -76,7 +122,7 @@ public class UserService {
 
     public ReturnService loginUser(LoginUserDto dto) {
 
-        if (ServiceFunctions.isNull(dto.getEmail()) || ServiceFunctions.isNull(dto.getPassword()))
+        if (ServiceFunctions.isNull(dto.getEmail()) && ServiceFunctions.isNull(dto.getPassword()))
             return ReturnService.returnError("error", Collections.singletonMap("user", "Please enter phone number or email"), dto, 0);
 
         if (!userExist(dto.getEmail(), dto.getPhoneNumber())) {
@@ -88,7 +134,7 @@ public class UserService {
         optionalUser = USER_REPOSITORY.findAllByEmail(dto.getEmail()).or(() -> USER_REPOSITORY.findAllByPhoneNumber(dto.getPhoneNumber()));
 
 
-        if (optionalUser.get().isEnabled()) {
+        if (!optionalUser.get().isEnabled()) {
             dto.setPassword("");
             return ReturnService.returnError("error", Collections.singletonMap("user", "Please active your account"), dto, 0);
         }
@@ -102,31 +148,41 @@ public class UserService {
         return ReturnService.returnInformation("Login success", informationUserDto, 1);
     }
 
-
-    //TODO confirm mail if mail was changed
     public ReturnService updateUser(UpdateUserDto dto) {
-        validationError.clear();
 
-        if (!userExist(dto.getEmail(), dto.getPhoneNumber()))
-            return ReturnService.returnError("error", Collections.singletonMap("user", "Can't find user with given email or phone number"), dto, 0);
+        if (!userExist(dto.getId()))
+            return ReturnService.returnError("error", Collections.singletonMap("user", String.format(USER_NOT_EXIST_MSG,"")),dto, 0);
+
         validationError = ValidationService.updateUserValidator(dto);
         if (!validationError.isEmpty())
-            return ReturnService.returnError("error", validationError,dto, 0);
+            return ReturnService.returnError("error", validationError, dto, 0);
 
         Optional<User> optionalUser = USER_REPOSITORY.findById(dto.getId());
+        if (optionalUser.isEmpty())
+            return ReturnService.returnError("Can't find user with given id",0);
+        String oldUserEmail = optionalUser.get().getEmail();
         try {
             User updatedUser = USER_REPOSITORY.save(User.updateUser(optionalUser.get(), dto));
-            if (!optionalUser.get().getEmail().equals(dto.getEmail())) {
+            if (!oldUserEmail.equals(dto.getEmail())) {
+                updatedUser.setLocked(true);
+                User updatedUserWithEmail = USER_REPOSITORY.save(updatedUser);
                 final ConfirmationToken CONFIRMATION_TOKEN = new ConfirmationToken(updatedUser);
+                Thread sendConfirmationToken = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        CONFIRMATION_TOKEN_SERVICE.saveConfirmationToken(CONFIRMATION_TOKEN);
+                        EMAIL_SERVICE.sendConfirmationTokenChangedEmail(updatedUser.getEmail(), CONFIRMATION_TOKEN.getConfirmationToken());
+                        updatedUser.setLocked(true);
+                        USER_REPOSITORY.save(updatedUser);
+                    }
+                });
 
-                CONFIRMATION_TOKEN_SERVICE.saveConfirmationToken(CONFIRMATION_TOKEN);
-                sendConfirmationToken(updatedUser.getEmail(), CONFIRMATION_TOKEN.getConfirmationToken());
-                updatedUser.setEnabled(false);
-                USER_REPOSITORY.save(updatedUser);
-                return ReturnService.returnInformation("Succ. update user: ", 1);
+                sendConfirmationToken.start();
+
+                return ReturnService.returnInformation("Your email changed, please confirm",InformationUserDto.of(updatedUserWithEmail), 1);
 
             }
-            return ReturnService.returnInformation("Succ. update user: ", 1);
+            return ReturnService.returnInformation("Succ. update user: ", InformationUserDto.of(updatedUser), 1);
         } catch (Exception ex) {
             return ReturnService.returnError("Err. update user " + ex.getMessage(), -1);
         }
@@ -143,44 +199,38 @@ public class UserService {
         return BCRYPT_PASSWORD_ENCODER.encode(password);
     }
 
-    private void sendConfirmationToken(String userMail, String token) {
-        final SimpleMailMessage simpleMailMessage = new SimpleMailMessage();
-        String activationLink = "http://127.0.0.1:8080/user/confirm?token=" + token;
-        String mailMessage = "Dziękujemy za rejestracje, proszę kliknąć w link aby aktywować konto \n";
-        simpleMailMessage.setTo(userMail);
-        simpleMailMessage.setSubject("Mail confirmation");
-        simpleMailMessage.setFrom("<MAIL>");
-        simpleMailMessage.setText(mailMessage + activationLink);
-        EMAIL_SERVICE.sendEmail(simpleMailMessage);
-
-    }
-
     public ReturnService resendConfirmationToken(ResendMailConfirmationDto dto) {
-        validationError.clear();
 
         if (ServiceFunctions.isNull(dto)) {
             dto.setPassword("");
-            return ReturnService.returnError("error", Collections.singletonMap("user", "Object cannot be null"),dto, 0);
+            return ReturnService.returnError("error", Collections.singletonMap("user", "Object cannot be null"), dto, 0);
         }
 
         if (!ServiceFunctions.validEmail(dto.getEmail())) {
             dto.setPassword("");
-            return ReturnService.returnError("error", Collections.singletonMap("user", "Please enter correct email address"),dto, 0);
+            return ReturnService.returnError("error", Collections.singletonMap("user", "Please enter correct email address"), dto, 0);
         }
 
         if (!userExist(dto.getEmail(), "")) {
             dto.setPassword("");
-            return ReturnService.returnError("error", Collections.singletonMap("user", "Can't find user with given email"), dto,0);
+            return ReturnService.returnError("error", Collections.singletonMap("user", "Can't find user with given email"), dto, 0);
         }
 
         Optional<User> optionalUser = USER_REPOSITORY.findAllByEmail(dto.getEmail());
         if (optionalUser.get().isEnabled())
-            return ReturnService.returnInformation("User already enabled",1);
+            return ReturnService.returnInformation("User already enabled", 1);
         final ConfirmationToken confirmationToken = new ConfirmationToken(optionalUser.get());
         try {
             CONFIRMATION_TOKEN_SERVICE.saveConfirmationToken(confirmationToken);
-            sendConfirmationToken(dto.getEmail(), confirmationToken.getConfirmationToken());
-            return ReturnService.returnInformation("Send success",1);
+            Thread resendConfirmationTokenThread = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    EMAIL_SERVICE.sendConfirmationToken(dto.getEmail(), confirmationToken.getConfirmationToken());
+                }
+            });
+
+            resendConfirmationTokenThread.start();
+            return ReturnService.returnInformation("Send success", 1);
         } catch (Exception ex) {
             return ReturnService.returnError("Err. send confirmation token " + ex.getMessage(), -1);
         }
@@ -188,7 +238,56 @@ public class UserService {
     }
 
     public ReturnService updateUserPassword(UpdateUserPasswordDto dto) {
-        return new ReturnService();
+
+        if (ServiceFunctions.isNull(dto.getEmail())) {
+            dto.setPassword("");
+            dto.setMatchingPassword("");
+            dto.setCurrentPassword("");
+            return ReturnService.returnError("error", Collections.singletonMap("user", "Email cannot be null"), dto, 0);
+        }
+
+        validationError = ValidationService.updateUserPasswordValidator(dto);
+        if (!validationError.isEmpty()) {
+            dto.setPassword("");
+            dto.setMatchingPassword("");
+            dto.setCurrentPassword("");
+            return ReturnService.returnError("error", validationError, dto, 0);
+        }
+
+        ReturnService ret = loginUser(LoginUserDto.of(dto));
+        if (ret.getStatus() != 1) {
+            dto.setPassword("");
+            dto.setMatchingPassword("");
+            dto.setCurrentPassword("");
+            return ReturnService.returnError("error", ret.getErrList(), dto, 0);
+        }
+
+        User oldUser = User.of((InformationUserDto) ret.getValue());
+        oldUser.setPassword(encodePassword(dto.getPassword()));
+
+        try {
+            User user = USER_REPOSITORY.save(oldUser);
+            oldUser.setLocked(true);
+            USER_REPOSITORY.save(oldUser);
+            final ConfirmationToken CONFIRMATION_TOKEN = new ConfirmationToken(user);
+
+            CONFIRMATION_TOKEN_SERVICE.saveConfirmationToken(CONFIRMATION_TOKEN);
+            Thread sendConfirmationThread = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    EMAIL_SERVICE.sendConfirmationTokenChangedPassword(user.getEmail(), CONFIRMATION_TOKEN.getConfirmationToken());
+                }
+            });
+
+            sendConfirmationThread.start();
+            return ReturnService.returnInformation("Confirm new password on email ", 1);
+        } catch (Exception ex) {
+            return ReturnService.returnError("Err. update user password " + ex.getMessage(), -1);
+        }
+
+    }
+    public boolean userExist(Long id) {
+        return USER_REPOSITORY.findById(id).isPresent();
     }
 
 }

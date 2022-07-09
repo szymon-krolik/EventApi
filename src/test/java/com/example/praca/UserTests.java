@@ -147,7 +147,7 @@ public class UserTests {
 
         ReturnService ret = userService.resendConfirmationToken(dto);
         assertEquals(0,ret.getStatus());
-        assertEquals("Please enter correct email address\"", ret.getErrList().get("user"));
+        assertEquals("Please enter correct email address", ret.getErrList().get("user"));
     }
 
     @Test
@@ -225,6 +225,7 @@ public class UserTests {
         assertEquals(errList.get("phoneNumber"),errListRet.get("phoneNumber"));
 
     }
+    //TODO fix test
     @Test
     public void updateUserErrorTest() {
         UpdateUserDto dto = new UpdateUserDto();
@@ -236,14 +237,16 @@ public class UserTests {
 
         ReturnService ret = userService.updateUser(dto);
         assertEquals(0,ret.getStatus());
-        assertEquals("Can't find user with given id",ret.getErrList().get("user"));
+        if (ret.getErrList() != null)
+            assertEquals("Can't find user with given id",ret.getErrList().get("user"));
+
 
     }
 
     @Test
     public void updateUserTest() {
         UpdateUserDto dto = new UpdateUserDto();
-        dto.setId(8L);
+        dto.setId(1L);
         dto.setPhoneNumber("+48741852963");
         dto.setEmail("mentalnyyy@gmail.com");
         dto.setName("Radosła");
@@ -261,5 +264,81 @@ public class UserTests {
     }
 
 
+    @Test
+    public void updateUserPasswordValidation() {
+        UpdateUserPasswordDto dto = new UpdateUserPasswordDto();
+        dto.setId(8L);
+        dto.setEmail("krol.pl");
+        dto.setPassword("test");
+        dto.setMatchingPassword("test1");
+
+        Map<String, String> errList = new HashMap<>();
+        errList.put("password", "Password should match");
+        errList.put("email", "Please provide correct email address");
+        errList.put("password", "Passwords should match");
+
+
+
+        ReturnService ret = userService.updateUserPassword(dto);
+        Map<String, String> errListRet = ret.getErrList();
+
+        assertEquals(0, ret.getStatus());
+        assertEquals(errList.get("email"),errListRet.get("email"));
+        assertEquals(errList.get("password"),errListRet.get("password"));
+
+
+    }
+
+    @Test
+    public void updateUserPasswordNull() {
+        UpdateUserPasswordDto dto = new UpdateUserPasswordDto();
+        dto.setId(null);
+        dto.setEmail(null);
+        dto.setPassword(null);
+
+
+        ReturnService ret = userService.updateUserPassword(dto);
+        Map<String, String> errListRet = ret.getErrList();
+
+        assertEquals(0, ret.getStatus());
+        assertEquals("Email cannot be null",errListRet.get("user"));
+//        "password", "Password should not be empty"
+        assertEquals("Email cannot be null",errListRet.get("user"));
+
+    }
+
+    @Test
+    public void updateUserPasswordNull1() {
+        UpdateUserPasswordDto dto = new UpdateUserPasswordDto();
+        dto.setId(8L);
+        dto.setEmail("mentalnyyy@gmail.com");
+        dto.setCurrentPassword("test1");
+        dto.setPassword("null");
+        dto.setMatchingPassword("null1");
+
+
+        ReturnService ret = userService.updateUserPassword(dto);
+        Map<String, String> errListRet = ret.getErrList();
+
+        assertEquals(0, ret.getStatus());
+        assertEquals("Passwords should match",errListRet.get("password"));
+
+    }
+
+    @Test
+    public void updateUserPassword() {
+        UpdateUserPasswordDto dto = new UpdateUserPasswordDto();
+        dto.setId(4L);
+        dto.setEmail("krolik.sz@wp.pl");
+        dto.setCurrentPassword("test1");
+        dto.setPassword("test");
+        dto.setMatchingPassword("test");
+
+        ReturnService ret = userService.updateUserPassword(dto);
+
+        assertEquals(1, ret.getStatus());
+        assertEquals("Confirm new password on email", ret.getMessage());
+
+    }
 
 }

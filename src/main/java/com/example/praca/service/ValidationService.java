@@ -2,6 +2,7 @@ package com.example.praca.service;
 
 import com.example.praca.dto.CreateUserDto;
 import com.example.praca.dto.UpdateUserDto;
+import com.example.praca.dto.UpdateUserPasswordDto;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -20,7 +21,7 @@ public class ValidationService {
     private final static int MIN_LENGTH = 3;
 
     public static Map<String, String> createUserValidator(CreateUserDto dto) {
-        errList.clear();
+
         if (ServiceFunctions.isNull(dto))
             return Collections.singletonMap("object", "Object cannot be null");
 
@@ -59,7 +60,7 @@ public class ValidationService {
     }
 
     public static Map<String, String> updateUserValidator(UpdateUserDto dto) {
-        errList.clear();
+
         if (ServiceFunctions.isNull(dto))
             return Collections.singletonMap("object", "Object cannot be null");
 
@@ -83,6 +84,31 @@ public class ValidationService {
             errList.put("name", "Name should have at least 3 characters");
         }
 
+
+        return errList;
+    }
+
+    public static Map<String, String> updateUserPasswordValidator(UpdateUserPasswordDto dto) {
+
+        if (ServiceFunctions.isNull(dto))
+            return Collections.singletonMap("object", "Object cannot be null");
+
+        if (!ServiceFunctions.isNull(dto.getEmail())) {
+            if (!ServiceFunctions.validEmail(dto.getEmail()))
+                errList.put("email", "Please provide correct email address");
+        } else {
+            errList.put("email", "Email cannot be null");
+        }
+        if (ServiceFunctions.isNull(dto.getPassword()))
+            errList.put("password", "Password should not be empty");
+
+        if (ServiceFunctions.isNull(dto.getMatchingPassword()))
+            errList.put("matchingPassword", "Matching password should not be empty");
+
+        if (!ServiceFunctions.isNull(dto.getPassword()) && !ServiceFunctions.isNull(dto.getMatchingPassword())) {
+            if (!dto.getPassword().toLowerCase(Locale.ROOT).equals(dto.getMatchingPassword().toLowerCase()))
+                errList.put("password", "Passwords should match");
+        }
 
         return errList;
     }
