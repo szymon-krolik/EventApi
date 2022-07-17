@@ -3,6 +3,7 @@ package com.example.praca.model;
 import com.example.praca.dto.CreateUserDto;
 import com.example.praca.dto.InformationUserDto;
 import com.example.praca.dto.UpdateUserDto;
+import com.example.praca.dto.hobby.AddHobbyToUserDto;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -11,7 +12,11 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import javax.persistence.*;
+import javax.transaction.Transactional;
 import java.util.Date;
+import java.util.List;
+import java.util.Set;
+
 /**
  * @author Szymon Królik
  */
@@ -51,6 +56,14 @@ public class User {
 
     @UpdateTimestamp
     private Date updatedAt;
+
+    @ManyToMany(cascade = {CascadeType.DETACH,CascadeType.MERGE,CascadeType.PERSIST,CascadeType.REFRESH})
+            @JoinTable(
+                    name = "user_hobbies",
+                    joinColumns = @JoinColumn(name = "user_id"),
+                    inverseJoinColumns = @JoinColumn(name = "hobby_id")
+            )
+    List<Hobby> hobbies;
 
 
     public static User of(CreateUserDto dto) {
@@ -94,4 +107,6 @@ public class User {
         return user;
 
     }
+
+
 }

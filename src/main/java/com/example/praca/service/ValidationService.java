@@ -3,6 +3,7 @@ package com.example.praca.service;
 import com.example.praca.dto.CreateUserDto;
 import com.example.praca.dto.UpdateUserDto;
 import com.example.praca.dto.UpdateUserPasswordDto;
+import com.example.praca.dto.hobby.AddHobbyToUserDto;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -111,6 +112,23 @@ public class ValidationService {
         }
 
         return errList;
+    }
+
+    public static Map<String, String> addHobbyToUserValidator(AddHobbyToUserDto dto) {
+        if (ServiceFunctions.isNull(dto))
+            return Collections.singletonMap("object", "Object cannot be null");
+
+        if (dto.getUserId() == null || dto.getUserId() < 0)
+             errList.put("userId","User id cannot be null or less than 0");
+
+        if (dto.getHobbies() == null) {
+            errList.put("hobbies","Hobbies cannot be null");
+        } else if (dto.getHobbies().size() == 0) {
+            errList.put("hobbies", "Please select more hobbies");
+        }
+
+        return errList;
+
     }
 
 }

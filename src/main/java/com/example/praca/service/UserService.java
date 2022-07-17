@@ -286,6 +286,7 @@ public class UserService {
         }
 
     }
+
     public boolean userExist(Long id) {
         return USER_REPOSITORY.findById(id).isPresent();
     }
