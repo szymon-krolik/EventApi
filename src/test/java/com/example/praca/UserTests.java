@@ -1,6 +1,7 @@
 package com.example.praca;
 
 import com.example.praca.dto.*;
+import com.example.praca.dto.hobby.DeleteHobbyUserDto;
 import com.example.praca.service.ReturnService;
 import com.example.praca.service.UserService;
 import static org.junit.jupiter.api.Assertions.*;
@@ -339,6 +340,23 @@ public class UserTests {
         assertEquals(1, ret.getStatus());
         assertEquals("Confirm new password on email", ret.getMessage());
 
+    }
+
+    @Test
+    public void deleteUserTest() {
+        ReturnService ret = userService.deleteUser(6L);
+        assertEquals(1, ret.getStatus());
+        assertEquals("Succ. User deleted", ret.getMessage());
+
+    }
+
+    @Test
+    public void aaa() {
+        DeleteHobbyUserDto dto = new DeleteHobbyUserDto();
+        dto.setUserId(null);
+        dto.setHobbyId(3L);
+        boolean ret = userService.test(dto);
+        assertEquals(true, ret);
     }
 
 }

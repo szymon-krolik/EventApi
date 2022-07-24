@@ -3,5 +3,5 @@ package com.example.praca.model;
  * @author Szymon Królik
  */
 public enum UserRole {
-    USER, ADMIN
+    NON_AUTH_USER, USER, ADMIN
 }

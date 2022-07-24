@@ -5,6 +5,7 @@ import java.util.Arrays;
 import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 /**
  * @author Szymon Królik
@@ -43,6 +44,17 @@ public class ServiceFunctions<T> {
 
     public static <T> boolean isNull(T obj) {
         return obj == null;
+    }
+
+    public static <T> boolean fieldIsNull(T obj) {
+        try {
+            return Arrays.stream(obj.getClass().getFields())
+                    .anyMatch(Objects::isNull);
+        } catch (NullPointerException ex) {
+            return true;
+        }
+
+
     }
 
 

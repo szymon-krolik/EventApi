@@ -2,14 +2,20 @@ package com.example.praca.service;
 
 import com.example.praca.dto.InformationUserDto;
 import com.example.praca.dto.hobby.AddHobbyToUserDto;
+import com.example.praca.dto.hobby.DeleteHobbyUserDto;
 import com.example.praca.model.Hobby;
 import com.example.praca.model.User;
 import com.example.praca.repository.HobbyRepository;
 import com.example.praca.repository.UserRepository;
 import com.nimbusds.oauth2.sdk.util.CollectionUtils;
 import lombok.AllArgsConstructor;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
+import javax.persistence.criteria.CriteriaBuilder;
+import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.Predicate;
+import javax.persistence.criteria.Root;
 import javax.transaction.Transactional;
 import java.util.*;
 
@@ -40,12 +46,11 @@ public class HobbyService {
         }
 
         for (Long id : dto.getHobbies()) {
-                if (!hobbyExist(id)) {
-                    validationError.put("hobby", "Can't find hobby with given id");
-                    return ReturnService.returnError("error", validationError, dto, 0);
-                }
+            if (!hobbyExist(id)) {
+                validationError.put("hobby", "Can't find hobby with given id");
+                return ReturnService.returnError("error", validationError, dto, 0);
+            }
         }
-
         User user = USER_REPOSITORY.findById(dto.getUserId()).get();
         userHobbiesList = user.getHobbies();
 
@@ -57,22 +62,21 @@ public class HobbyService {
         userHobbiesList.addAll(hobbyList);
 
         try {
-
             user.setHobbies(userHobbiesList);
             USER_REPOSITORY.save(user);
             return ReturnService.returnInformation("Succ. hobby added", dto, 1);
-        }catch (Exception ex) {
+        } catch (Exception ex) {
             return ReturnService.returnError("Err. add hobby to user exception: " + ex.getMessage(), -1);
         }
 
-
-
     }
-
-
     @Transactional
     public boolean hobbyExist(Long id) {
         return HOBBY_REPOSITORY.findById(id).isPresent();
     }
 
+    public ReturnService deleteHobbyUser(DeleteHobbyUserDto dto) {
+
+        return null;
+    }
 }

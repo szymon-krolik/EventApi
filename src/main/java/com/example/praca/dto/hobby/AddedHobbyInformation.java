@@ -8,6 +8,7 @@ import lombok.Data;
  */
 @Data
 public class AddedHobbyInformation {
+
     private Long id;
     private String name;
 
@@ -19,4 +20,6 @@ public class AddedHobbyInformation {
 
         return dto;
     }
+
+
 }

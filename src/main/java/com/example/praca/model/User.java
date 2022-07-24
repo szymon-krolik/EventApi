@@ -42,7 +42,7 @@ public class User {
     private String phoneNumber;
 
     @Column(nullable = false)
-    private UserRole role = UserRole.USER;
+    private UserRole role = UserRole.NON_AUTH_USER;
 
     @Column(nullable = false)
     private boolean locked = false;
@@ -108,5 +108,6 @@ public class User {
 
     }
 
-
+    @OneToMany(mappedBy="user")
+    private List<Event> events;
 }

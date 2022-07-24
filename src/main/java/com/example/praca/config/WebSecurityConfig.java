@@ -2,6 +2,7 @@ package com.example.praca.config;
 
 
 
+import com.example.praca.model.UserRole;
 import com.example.praca.service.UserService;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;

@@ -14,5 +14,5 @@ import java.util.Set;
  */
 @Repository
 public interface HobbyRepository extends JpaRepository<Hobby, Long> {
-
+    void deleteAllByUsers(User user);
 }

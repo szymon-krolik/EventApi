@@ -6,6 +6,9 @@ import com.example.praca.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
 /**
  * @author Szymon Królik
  */
@@ -36,7 +39,7 @@ public class UserController {
         return USER_SERVICE.confirmMail(token);
     }
 
-    @PutMapping
+    @PutMapping("/update")
     public ReturnService updateUser(@RequestBody UpdateUserDto dto) {
         return USER_SERVICE.updateUser(dto);
     }
@@ -53,5 +56,15 @@ public class UserController {
     @PostMapping("/login")
     public ReturnService loginUser(@RequestBody LoginUserDto dto) {
         return USER_SERVICE.loginUser(dto);
+    }
+
+    @DeleteMapping("/delete")
+    public ReturnService deleteUser(@RequestParam Long userId) {
+        return USER_SERVICE.deleteUser(userId);
+    }
+
+    @PutMapping("/ban-user")
+    public ReturnService banUser(@RequestParam Long userId) {
+        return USER_SERVICE.banUser(userId);
     }
 }

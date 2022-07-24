@@ -2,9 +2,12 @@ package com.example.praca.service;
 
 
 import com.example.praca.dto.*;
+import com.example.praca.dto.hobby.DeleteHobbyUserDto;
 import com.example.praca.model.ConfirmationToken;
 import com.example.praca.model.User;
+import com.example.praca.model.UserRole;
 import com.example.praca.repository.ConfirmationTokenRepository;
+import com.example.praca.repository.HobbyRepository;
 import com.example.praca.repository.UserRepository;
 import lombok.AllArgsConstructor;
 import org.springframework.mail.SimpleMailMessage;
@@ -12,6 +15,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import javax.transaction.Transactional;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
@@ -22,8 +26,11 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 @Service
 @AllArgsConstructor
+//TODO USER SESSION!!
+//TODO czy uzywac buildera?
 public class UserService {
     private final UserRepository USER_REPOSITORY;
+    private final HobbyRepository HOBBY_REPOSITORY;
     private final String USER_NOT_EXIST_MSG = "Can't find user with %s";
 
 
@@ -77,6 +84,7 @@ public class UserService {
 
         User user = optionalConfirmationToken.get().getUser();
         user.setEnabled(true);
+        user.setRole(UserRole.USER);
         try {
             User activatedUser = USER_REPOSITORY.save(user);
             CONFIRMATION_TOKEN_REPOSITORY.deleteById(optionalConfirmationToken.get().getId());
@@ -291,4 +299,36 @@ public class UserService {
         return USER_REPOSITORY.findById(id).isPresent();
     }
 
+    //TODO check if user is logged
+    @Transactional
+    public ReturnService deleteUser(Long userId) {
+        Optional<User> optionalUser = USER_REPOSITORY.findById(userId);
+        if (optionalUser.isEmpty()) {
+            return ReturnService.returnError("Can't find user with given id",0);
+        }
+        try {
+            USER_REPOSITORY.delete(optionalUser.get());
+            HOBBY_REPOSITORY.deleteAllByUsers(optionalUser.get());
+            return ReturnService.returnInformation("Succ. User deleted", 1);
+        } catch (Exception ex) {
+            return ReturnService.returnError("Err. create user exception: " + ex.getMessage(), -1);
+        }
+
+    }
+
+    public ReturnService banUser(Long userId) {
+        Optional<User> optionalUser = USER_REPOSITORY.findById(userId);
+        ReturnService ret = new ReturnService();
+        if (optionalUser.isEmpty()) {
+            return ReturnService.returnError("Can't find user with given id",0);
+        }
+        ret.setValue(optionalUser.get());
+        ret.setStatus(1);
+
+        return ret;
+    }
+
+    public boolean test(DeleteHobbyUserDto dto) {
+        return ServiceFunctions.fieldIsNull(dto);
+    }
 }
