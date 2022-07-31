@@ -3,6 +3,9 @@ package com.example.praca.dto;
 import com.example.praca.model.User;
 import lombok.Data;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
 /**
  * @author Szymon Królik
  */
@@ -12,6 +15,9 @@ public class InformationUserDto {
     private String name;
     private String email;
     private String phoneNumber;
+    private String token;
+
+    private List<String> authorities;
 
     public static InformationUserDto of(User user) {
         InformationUserDto dto = new InformationUserDto();
@@ -20,6 +26,7 @@ public class InformationUserDto {
         dto.setName(user.getName());
         dto.setEmail(user.getEmail());
         dto.setPhoneNumber(user.getPhoneNumber());
+        dto.setAuthorities(user.getAuthorities().stream().map(s -> s.getAuthority()).collect(Collectors.toList()));
 
         return dto;
     }

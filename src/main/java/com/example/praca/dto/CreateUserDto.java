@@ -1,6 +1,9 @@
 package com.example.praca.dto;
 
+import com.example.praca.model.UserRole;
 import lombok.Data;
+
+import java.util.List;
 
 /**
  * @author Szymon Królik
@@ -12,6 +15,7 @@ public class CreateUserDto {
     private String password;
     private String matchingPassword;
     private String phoneNumber;
+    private List<UserRole> userRole;
 
     public static CreateUserDto of(UpdateUserDto dto) {
         CreateUserDto user = new CreateUserDto();

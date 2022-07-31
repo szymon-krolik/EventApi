@@ -10,12 +10,15 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.springframework.data.annotation.CreatedBy;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
 
 import javax.persistence.*;
 import javax.transaction.Transactional;
-import java.util.Date;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * @author Szymon Królik
@@ -26,8 +29,8 @@ import java.util.Set;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class User {
-    private static final User EMPTY = new User();
+public class User implements UserDetails {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -42,14 +45,13 @@ public class User {
     private String phoneNumber;
 
     @Column(nullable = false)
-    private UserRole role = UserRole.NON_AUTH_USER;
-
-    @Column(nullable = false)
     private boolean locked = false;
 
     @Column(nullable = false)
     private boolean enabled = false;
 
+    @CreatedBy
+    private String createdBy;
     @CreationTimestamp
     @Column(updatable = false)
     private Date createdAt;
@@ -65,6 +67,38 @@ public class User {
             )
     List<Hobby> hobbies;
 
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        return roles.stream()
+                .map(role -> new SimpleGrantedAuthority(role.getName()))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public String getUsername() {
+        return email;
+    }
+
+    @Override
+    public boolean isAccountNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isAccountNonLocked() {
+        return true;
+    }
+
+    @Override
+    public boolean isCredentialsNonExpired() {
+        return true;
+    }
+
+    @OneToMany(mappedBy="user")
+    private List<Event> events;
+
+    @ManyToMany(cascade = CascadeType.PERSIST, fetch = FetchType.EAGER)
+    private List<UserRole> roles;
 
     public static User of(CreateUserDto dto) {
         User user = new User();
@@ -73,6 +107,7 @@ public class User {
         user.setName(dto.getName());
         user.setPassword(dto.getPassword());
         user.setPhoneNumber(dto.getPhoneNumber());
+        user.setRoles(dto.getUserRole());
 
         return user;
     }
@@ -108,6 +143,4 @@ public class User {
 
     }
 
-    @OneToMany(mappedBy="user")
-    private List<Event> events;
 }

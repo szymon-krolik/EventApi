@@ -9,28 +9,45 @@ import com.example.praca.model.UserRole;
 import com.example.praca.repository.ConfirmationTokenRepository;
 import com.example.praca.repository.HobbyRepository;
 import com.example.praca.repository.UserRepository;
+import com.example.praca.repository.UserRoleRepository;
+import com.nimbusds.oauth2.sdk.util.StringUtils;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwt;
+import io.jsonwebtoken.impl.DefaultClaims;
+import io.netty.util.internal.StringUtil;
 import lombok.AllArgsConstructor;
-import org.springframework.mail.SimpleMailMessage;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import javax.management.relation.Role;
 import javax.transaction.Transactional;
+import java.security.Principal;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 /**
  * @author Szymon Królik
  */
+
 @Service
 @AllArgsConstructor
 //TODO USER SESSION!!
 //TODO czy uzywac buildera?
-public class UserService {
+@Transactional
+public class UserService   {
+    //TODO problem przy aktualizacji usera z tym samym email(porównanie danych i co updaterowac)
     private final UserRepository USER_REPOSITORY;
     private final HobbyRepository HOBBY_REPOSITORY;
+
+    private final UserRoleRepository USER_ROLE_REPOSITORY;
+
+    private final JwtTokenService JWT_TOKEN_SERVICE;
     private final String USER_NOT_EXIST_MSG = "Can't find user with %s";
 
 
@@ -52,8 +69,12 @@ public class UserService {
         }
 
         dto.setPassword(encodePassword(dto.getPassword()));
-
-
+        Optional<UserRole> optionalRole = USER_ROLE_REPOSITORY.findByName("UNAUTHENTICATED_USER");
+        //TODO exception??
+        if (optionalRole.isEmpty()) {
+            throw new RuntimeException("Brak roli");
+        }
+        dto.setUserRole(Collections.singletonList(optionalRole.get()));
         try {
             User user = USER_REPOSITORY.save(User.of(dto));
 
@@ -84,11 +105,35 @@ public class UserService {
 
         User user = optionalConfirmationToken.get().getUser();
         user.setEnabled(true);
-        user.setRole(UserRole.USER);
+        Optional<UserRole> optionalUserRole = USER_ROLE_REPOSITORY.findByName("USER");
+        if (optionalUserRole.isEmpty())
+            return ReturnService.returnError("Can't find role", 0);
+
+        /**
+         * Usuwanie starej roli z listy oraz dodanie roli potwierdzonego użytkownika
+         */
+        List<UserRole> currentUserRoles = user.getRoles();
+        currentUserRoles.removeIf(x -> x.getName().equals("UNAUTHENTICATED_USER"));
+
+        currentUserRoles.add(optionalUserRole.get());
+        user.setRoles(currentUserRoles);
+
+
         try {
             User activatedUser = USER_REPOSITORY.save(user);
             CONFIRMATION_TOKEN_REPOSITORY.deleteById(optionalConfirmationToken.get().getId());
-            return ReturnService.returnInformation("User active", InformationUserDto.of(activatedUser), 1);
+
+            /**
+             * Tworzenie nowego JWToken ponieważ zmieniła się rola użytkownika, która jest wykorzystywana do autoryzacji przy zapytaniach API
+             */
+            Claims claims = new DefaultClaims();
+            List<String> authorities = user.getAuthorities().stream().map(s -> s.getAuthority()).collect(Collectors.toList());
+            claims.put("authorities", authorities);
+            String jwtToken = JwtTokenService.generateJwtoken(user.getEmail(), claims);
+            InformationUserDto informationUserDto = InformationUserDto.of(activatedUser);
+            informationUserDto.setToken(jwtToken);
+
+            return ReturnService.returnInformation("User active", informationUserDto, 1);
         } catch (Exception ex) {
             return ReturnService.returnError("Err. User activation: " + ex.getMessage(), -1);
         }
@@ -153,6 +198,13 @@ public class UserService {
         }
 
         InformationUserDto informationUserDto = InformationUserDto.of(optionalUser.get());
+
+        Claims claims = new DefaultClaims();
+        List<String> authorities = informationUserDto.getAuthorities();
+        claims.put("authorities", authorities);
+        String jwtToken = JwtTokenService.generateJwtoken(informationUserDto.getEmail(), claims);
+        informationUserDto.setToken(jwtToken);
+
         return ReturnService.returnInformation("Login success", informationUserDto, 1);
     }
 
@@ -160,6 +212,9 @@ public class UserService {
 
         if (!userExist(dto.getId()))
             return ReturnService.returnError("error", Collections.singletonMap("user", String.format(USER_NOT_EXIST_MSG,"")),dto, 0);
+        if (!isMyProfile(dto.getId()))
+            return ReturnService.returnError("Not your profile",0);
+
 
         validationError = ValidationService.updateUserValidator(dto);
         if (!validationError.isEmpty())
@@ -194,17 +249,6 @@ public class UserService {
         } catch (Exception ex) {
             return ReturnService.returnError("Err. update user " + ex.getMessage(), -1);
         }
-    }
-
-    private boolean userExist(String email, String phoneNumber) {
-        if (USER_REPOSITORY.findAllByEmail(email).isPresent() || USER_REPOSITORY.findAllByPhoneNumber(phoneNumber).isPresent())
-            return true;
-
-        return false;
-    }
-
-    private String encodePassword(String password) {
-        return BCRYPT_PASSWORD_ENCODER.encode(password);
     }
 
     public ReturnService resendConfirmationToken(ResendMailConfirmationDto dto) {
@@ -295,17 +339,14 @@ public class UserService {
 
     }
 
-    public boolean userExist(Long id) {
-        return USER_REPOSITORY.findById(id).isPresent();
-    }
-
-    //TODO check if user is logged
-    @Transactional
     public ReturnService deleteUser(Long userId) {
         Optional<User> optionalUser = USER_REPOSITORY.findById(userId);
         if (optionalUser.isEmpty()) {
             return ReturnService.returnError("Can't find user with given id",0);
         }
+        if (!isMyProfile(userId))
+            return ReturnService.returnError("Not your profile",0);
+
         try {
             USER_REPOSITORY.delete(optionalUser.get());
             HOBBY_REPOSITORY.deleteAllByUsers(optionalUser.get());
@@ -330,5 +371,48 @@ public class UserService {
 
     public boolean test(DeleteHobbyUserDto dto) {
         return ServiceFunctions.fieldIsNull(dto);
+    }
+
+    public ReturnService userProfile(String email) {
+        if (ServiceFunctions.isNull(email))
+            return ReturnService.returnError("Can't find user", 0);
+
+        Optional<User> userOptional = USER_REPOSITORY.findByEmail(email);
+        if (userOptional.isEmpty())
+            return ReturnService.returnError("Can't find user", 0);
+
+        InformationUserDto dto =  InformationUserDto.of(userOptional.get());
+        return ReturnService.returnInformation("Succ.",dto, 1);
+
+    }
+
+    private  boolean isMyProfile(Long userId) {
+        String token = JwtTokenService.getJwtokenFromHeader();
+        Claims claims = new DefaultClaims();
+
+        if (StringUtils.isNotBlank(token) && !token.isEmpty())
+             claims = JwtTokenService.getClaimsFromJwtoken(token);
+
+        Optional<User> user = USER_REPOSITORY.findByEmail(claims.get("sub").toString());
+        if (user.isEmpty())
+            return false;
+
+        return userId == user.get().getId();
+
+    }
+
+    private boolean userExist(String email, String phoneNumber) {
+        if (USER_REPOSITORY.findAllByEmail(email).isPresent() || USER_REPOSITORY.findAllByPhoneNumber(phoneNumber).isPresent())
+            return true;
+
+        return false;
+    }
+
+    private String encodePassword(String password) {
+        return BCRYPT_PASSWORD_ENCODER.encode(password);
+    }
+
+    public boolean userExist(Long id) {
+        return USER_REPOSITORY.findById(id).isPresent();
     }
 }
